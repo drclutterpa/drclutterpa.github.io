@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crew Dashboard | Dr Clutter</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="icon" href="assets/mascot-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* ── Login Screen ── */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-card{background:#fff;border-radius:16px;padding:32px;max-width:340px;width:100%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.login-card img{width:64px;height:64px;border-radius:14px;margin-bottom:12px}
+.login-card h1{font-size:20px;font-weight:800;margin-bottom:4px}
+.login-card p{font-size:13px;color:#888;margin-bottom:20px}
+.pin-input{display:flex;gap:8px;justify-content:center;margin-bottom:16px}
+.pin-input input{width:48px;height:56px;text-align:center;font-size:24px;font-weight:800;border:2px solid #ddd;border-radius:10px;font-family:inherit}
+.pin-input input:focus{outline:none;border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.1)}
+.pin-error{color:#dc2626;font-size:12px;display:none;margin-bottom:8px}
+.pin-btn{width:100%;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+.pin-btn:hover{background:#15803d}
+
+/* ── Dashboard ── */
+.dashboard{display:none}
+.dash-header{background:#1a1a2e;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+.dash-header img{width:40px;height:40px;border-radius:10px}
+.dash-header-text{flex:1}
+.dash-header-text .brand{font-size:11px;font-weight:700;opacity:.8;letter-spacing:.5px;text-transform:uppercase}
+.dash-header-text .dh-title{font-size:18px;font-weight:800}
+.dash-header .dh-date{font-size:12px;opacity:.7}
+.logout-btn{background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+.logout-btn:hover{background:rgba(255,255,255,.25)}
+
+/* ── Stats Bar ── */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#fff;border-bottom:1px solid #e8e8e8}
+.stat{padding:14px 8px;text-align:center;border-right:1px solid #f0f0f0}
+.stat:last-child{border-right:none}
+.stat .stat-num{font-size:22px;font-weight:900}
+.stat .stat-label{font-size:10px;color:#888;text-transform:uppercase;font-weight:600;letter-spacing:.3px}
+.stat.pending .stat-num{color:#d97706}
+.stat.confirmed .stat-num{color:#2563eb}
+.stat.enroute .stat-num{color:#7c3aed}
+.stat.complete .stat-num{color:#16a34a}
+
+/* ── Tab Bar ── */
+.tab-bar{display:flex;background:#fff;border-bottom:1px solid #e8e8e8;padding:0 16px}
+.tab{padding:12px 16px;font-size:13px;font-weight:600;color:#888;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:#16a34a;border-bottom-color:#16a34a}
+.tab:hover{color:#333}
+
+/* ── Job Cards ── */
+.jobs-container{max-width:600px;margin:0 auto;padding:16px}
+.section-label{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;padding:8px 0 6px}
+.job-card{background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden;border:1px solid #e8e8e8;transition:box-shadow .2s}
+.job-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.job-top{display:flex;align-items:center;padding:12px 14px;gap:10px;cursor:pointer}
+.job-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.job-status-dot.pending{background:#d97706}
+.job-status-dot.confirmed{background:#2563eb}
+.job-status-dot.enroute{background:#7c3aed}
+.job-status-dot.complete{background:#16a34a}
+.job-info{flex:1;min-width:0}
+.job-name{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.job-meta{font-size:11px;color:#888;display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+.job-right{text-align:right;flex-shrink:0}
+.job-price{font-size:16px;font-weight:800;color:#16a34a}
+.job-time{font-size:11px;color:#888}
+
+/* ── Job Detail (expanded) ── */
+.job-detail{display:none;padding:0 14px 14px;border-top:1px solid #f0f0f0}
+.job-detail.open{display:block}
+.jd-row{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #f8f8f8;font-size:13px}
+.jd-row:last-child{border-bottom:none}
+.jd-label{color:#888;font-weight:600;min-width:80px;font-size:12px}
+.jd-value{font-weight:500}
+.jd-photos{display:flex;gap:6px;margin-top:6px}
+.jd-photos img{width:60px;height:60px;border-radius:8px;object-fit:cover;cursor:pointer;border:1px solid #ddd}
+.jd-photos img:hover{border-color:#16a34a}
+
+/* ── Status Actions ── */
+.status-actions{display:flex;gap:8px;padding-top:10px}
+.status-btn{flex:1;padding:10px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s}
+.status-btn.confirm-btn{background:#dbeafe;color:#2563eb}
+.status-btn.confirm-btn:hover{background:#bfdbfe}
+.status-btn.enroute-btn{background:#ede9fe;color:#7c3aed}
+.status-btn.enroute-btn:hover{background:#ddd6fe}
+.status-btn.complete-btn{background:#dcfce7;color:#16a34a}
+.status-btn.complete-btn:hover{background:#bbf7d0}
+.status-btn.call-btn{background:#fff;border:1px solid #ddd;color:#333}
+.status-btn.call-btn:hover{background:#f8f8f8}
+.status-btn.delete-btn{background:#fef2f2;color:#dc2626}
+.status-btn.delete-btn:hover{background:#fee2e2}
+.status-btn.approve-btn{background:#dcfce7;color:#16a34a}
+.status-btn.approve-btn:hover{background:#bbf7d0}
+.status-btn.deny-btn{background:#fef2f2;color:#dc2626}
+.status-btn.deny-btn:hover{background:#fee2e2}
+
+/* ── Approval Status Colors ── */
+.job-status-dot.approved{background:#16a34a}
+.job-status-dot.denied{background:#dc2626}
+.job-status-dot.expired{background:#9ca3af}
+.stat.approved .stat-num{color:#16a34a}
+
+/* ── Countdown Timer ── */
+.countdown{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;background:#fef3c7;color:#92400e}
+.countdown.urgent{background:#fef2f2;color:#dc2626;animation:pulse 2s infinite}
+.countdown.expired-badge{background:#f3f4f6;color:#6b7280}
+.denied-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#fef2f2;color:#dc2626}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* ── Empty State ── */
+.empty-state{text-align:center;padding:40px 20px;color:#aaa}
+.empty-state .empty-icon{font-size:48px;margin-bottom:8px}
+.empty-state p{font-size:14px}
+
+/* ── Photo Modal ── */
+.photo-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);z-index:200;align-items:center;justify-content:center;padding:20px}
+.photo-modal.open{display:flex}
+.photo-modal img{max-width:100%;max-height:90vh;border-radius:8px}
+.photo-modal-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.2);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer}
+
+/* ── Footer ── */
+.dash-footer{text-align:center;padding:20px;font-size:11px;color:#aaa;margin-top:20px}
+
+@media(max-width:400px){
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+  .stat{border-bottom:1px solid #f0f0f0}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-card">
+    <img src="assets/mascot-icon.png" alt="Dr Clutter" onerror="this.style.display='none'">
+    <h1>Crew Dashboard</h1>
+    <p>Enter the 4-digit PIN to view bookings.</p>
+    <div class="pin-input" id="pinInput">
+      <input type="tel" maxlength="1" autofocus>
+      <input type="tel" maxlength="1">
+      <input type="tel" maxlength="1">
+      <input type="tel" maxlength="1">
+    </div>
+    <div class="pin-error" id="pinError">Wrong PIN. Try again.</div>
+    <button class="pin-btn" id="loginBtn" onclick="checkPin()">Unlock</button>
+    <p class="pin-hint" style="margin-top:16px;font-size:11px;color:#aaa">Default PIN: 2011 (year Dr Clutter started)</p>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard" id="dashboard">
+  <div class="dash-header">
+    <img src="assets/mascot-icon.png" alt="Dr Clutter" onerror="this.style.display='none'">
+    <div class="dash-header-text">
+      <div class="brand">Dr Clutter</div>
+      <div class="dh-title">Crew Dashboard</div>
+    </div>
+    <div class="dh-date" id="dashDate"></div>
+    <button class="logout-btn" onclick="logout()">Logout</button>
+  </div>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat pending"><div class="stat-num" id="stat-pending">0</div><div class="stat-label">Pending</div></div>
+    <div class="stat approved"><div class="stat-num" id="stat-approved">0</div><div class="stat-label">Approved</div></div>
+    <div class="stat enroute"><div class="stat-num" id="stat-enroute">0</div><div class="stat-label">En Route</div></div>
+    <div class="stat complete"><div class="stat-num" id="stat-complete">0</div><div class="stat-label">Done Today</div></div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('today')">Today</div>
+    <div class="tab" onclick="switchTab('upcoming')">Upcoming</div>
+    <div class="tab" onclick="switchTab('completed')">Completed</div>
+    <div class="tab" onclick="switchTab('denied')">Denied</div>
+  </div>
+
+  <div class="jobs-container" id="jobsContainer">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">📭</div>
+      <p>No bookings yet. They'll show up here when customers book online.</p>
+    </div>
+  </div>
+
+  <div class="dash-footer">
+    Dr Clutter Crew Dashboard · <a href="index.html" style="color:#16a34a">Back to site</a>
+  </div>
+</div>
+
+<!-- Photo Modal -->
+<div class="photo-modal" id="photoModal" onclick="closePhotoModal()">
+  <button class="photo-modal-close" onclick="closePhotoModal()">×</button>
+  <img id="photoModalImg" src="" alt="Job photo">
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// Dr Clutter — Admin Dashboard
+// With 12-hour approval/deny workflow
+// ══════════════════════════════════════════
+
+const ADMIN_PIN = (typeof APP_CONFIG !== 'undefined') ? APP_CONFIG.admin.pin : '2011';
+const REVIEW_WINDOW_HOURS = 12;
+let currentTab = 'today';
+let countdownInterval = null;
+
+// ── PIN Input Auto-advance ──
+const pinInputs = document.querySelectorAll('#pinInput input');
+pinInputs.forEach((inp, i) => {
+  inp.addEventListener('input', e => {
+    if (e.target.value && i < 3) pinInputs[i+1].focus();
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !e.target.value && i > 0) pinInputs[i-1].focus();
+    if (e.key === 'Enter') checkPin();
+  });
+});
+
+function enterDashboard() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  loadDashboard();
+}
+
+async function checkPin() {
+  const errEl = document.getElementById('pinError');
+
+  // Demo mode: keep the simple PIN gate
+  if (DB.isDemo()) {
+    const pin = Array.from(pinInputs).map(i => i.value).join('');
+    if (pin === ADMIN_PIN) {
+      enterDashboard();
+    } else {
+      errEl.textContent = 'Wrong PIN. Try again.';
+      errEl.style.display = 'block';
+      pinInputs.forEach(i => { i.value = ''; });
+      pinInputs[0].focus();
+    }
+    return;
+  }
+
+  // Live mode: Supabase Auth (email + password)
+  const email = (document.getElementById('adminEmail') || {}).value || '';
+  const password = (document.getElementById('adminPassword') || {}).value || '';
+  const btn = document.getElementById('loginBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+  try {
+    await DB.signIn(email, password);
+    enterDashboard();
+  } catch (e) {
+    errEl.textContent = 'Sign-in failed. Check your email and password.';
+    errEl.style.display = 'block';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
+  }
+}
+
+// Swap the PIN screen for an email/password login when running live
+function setupLogin() {
+  if (DB.isDemo()) return;
+  const card = document.querySelector('.login-card');
+  const pinRow = document.getElementById('pinInput');
+  if (pinRow) pinRow.style.display = 'none';
+  // Update subtitle, drop the "Default PIN" hint
+  const sub = card.querySelector('p');
+  if (sub) sub.textContent = 'Sign in to manage bookings';
+  const hint = card.querySelector('.pin-hint');
+  if (hint) hint.remove();
+  // Inject email + password fields above the error line
+  const errEl = document.getElementById('pinError');
+  const wrap = document.createElement('div');
+  wrap.style.textAlign = 'left';
+  wrap.innerHTML =
+    '<label style="font-size:12px;font-weight:600;color:#555">Email</label>' +
+    '<input id="adminEmail" type="email" autocomplete="username" style="width:100%;padding:12px;margin:4px 0 12px;border:2px solid #ddd;border-radius:10px;font-size:15px;font-family:inherit">' +
+    '<label style="font-size:12px;font-weight:600;color:#555">Password</label>' +
+    '<input id="adminPassword" type="password" autocomplete="current-password" style="width:100%;padding:12px;margin:4px 0 4px;border:2px solid #ddd;border-radius:10px;font-size:15px;font-family:inherit">';
+  card.insertBefore(wrap, errEl);
+  const btn = document.getElementById('loginBtn');
+  if (btn) btn.textContent = 'Sign In';
+  document.getElementById('adminPassword').addEventListener('keydown', e => { if (e.key === 'Enter') checkPin(); });
+  // Skip login if already signed in this device
+  DB.hasSession().then(s => { if (s) enterDashboard(); }).catch(() => {});
+}
+
+async function logout() {
+  await DB.signOut();
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  pinInputs.forEach(i => { i.value = ''; });
+  if (countdownInterval) clearInterval(countdownInterval);
+}
+
+// ── Load Dashboard ──
+async function loadDashboard() {
+  const now = new Date();
+  const opts = { weekday: 'long', month: 'short', day: 'numeric' };
+  document.getElementById('dashDate').textContent = now.toLocaleDateString('en-US', opts);
+
+  await checkExpiredBookings();
+  await renderJobs();
+
+  // Refresh loop: expire stale bookings, tick countdowns, and (live) pull new bookings
+  if (countdownInterval) clearInterval(countdownInterval);
+  countdownInterval = setInterval(async () => {
+    await checkExpiredBookings();
+    updateCountdowns();
+    if (!DB.isDemo()) await renderJobs();
+  }, 30000);
+}
+
+// ── Expire bookings past 12-hour window ──
+async function checkExpiredBookings() {
+  const bookings = await DB.getBookings();
+  const now = new Date();
+  for (const b of bookings) {
+    if (b.status === 'pending') {
+      const created = new Date(b.createdAt);
+      const deadline = new Date(created.getTime() + REVIEW_WINDOW_HOURS * 60 * 60 * 1000);
+      if (now > deadline) {
+        await DB.updateBooking(b.code, { status: 'expired' });
+      }
+    }
+  }
+}
+
+// ── Countdown helper ──
+function getTimeRemaining(createdAt) {
+  const created = new Date(createdAt);
+  const deadline = new Date(created.getTime() + REVIEW_WINDOW_HOURS * 60 * 60 * 1000);
+  const now = new Date();
+  const diff = deadline - now;
+
+  if (diff <= 0) return { expired: true, text: 'Expired' };
+
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (hours > 0) return { expired: false, urgent: hours < 2, text: `${hours}h ${minutes}m left` };
+  return { expired: false, urgent: true, text: `${minutes}m left` };
+}
+
+function updateCountdowns() {
+  document.querySelectorAll('[data-countdown-created]').forEach(el => {
+    const remaining = getTimeRemaining(el.dataset.countdownCreated);
+    el.textContent = remaining.text;
+    el.className = 'countdown' + (remaining.expired ? ' expired-badge' : remaining.urgent ? ' urgent' : '');
+  });
+}
+
+async function renderJobs() {
+  const bookings = await DB.getBookings();
+  const today = new Date().toISOString().split('T')[0];
+  const container = document.getElementById('jobsContainer');
+  const empty = document.getElementById('emptyState');
+
+  // Filter by tab
+  let filtered;
+  if (currentTab === 'today') {
+    filtered = bookings.filter(b => b.date === today && !['complete','denied','expired'].includes(b.status));
+  } else if (currentTab === 'upcoming') {
+    filtered = bookings.filter(b => b.date > today && !['denied','expired'].includes(b.status));
+  } else if (currentTab === 'denied') {
+    filtered = bookings.filter(b => b.status === 'denied' || b.status === 'expired');
+  } else {
+    filtered = bookings.filter(b => b.status === 'complete');
+  }
+
+  // Update stats (today only)
+  const todayBookings = bookings.filter(b => b.date === today);
+  document.getElementById('stat-pending').textContent = todayBookings.filter(b => b.status === 'pending').length;
+  document.getElementById('stat-approved').textContent = todayBookings.filter(b => b.status === 'approved').length;
+  document.getElementById('stat-enroute').textContent = todayBookings.filter(b => b.status === 'enroute').length;
+  document.getElementById('stat-complete').textContent = todayBookings.filter(b => b.status === 'complete').length;
+
+  // Clear container except empty state
+  Array.from(container.children).forEach(child => {
+    if (child.id !== 'emptyState') child.remove();
+  });
+
+  if (!filtered.length) {
+    empty.style.display = 'block';
+    const msgs = { today: 'No jobs for today.', upcoming: 'No upcoming bookings.', completed: 'No completed jobs yet.', denied: 'No denied or expired bookings.' };
+    empty.querySelector('p').textContent = msgs[currentTab];
+    return;
+  }
+
+  empty.style.display = 'none';
+
+  // Sort: pending first (most urgent), then approved, then enroute
+  filtered.sort((a, b) => {
+    const order = { pending: 0, approved: 1, enroute: 2, complete: 3, denied: 4, expired: 5 };
+    if ((order[a.status] || 0) !== (order[b.status] || 0)) {
+      return (order[a.status] || 0) - (order[b.status] || 0);
+    }
+    // Within pending, sort by most urgent (closest to expiring)
+    if (a.status === 'pending' && b.status === 'pending') {
+      return new Date(a.createdAt) - new Date(b.createdAt);
+    }
+    return 0;
+  });
+
+  filtered.forEach(job => {
+    const card = document.createElement('div');
+    card.className = 'job-card';
+    card.id = 'job-' + job.code;
+
+    const statusLabel = {
+      pending: 'Awaiting Approval',
+      approved: 'Approved',
+      enroute: 'En Route',
+      complete: 'Complete',
+      denied: 'Denied',
+      expired: 'Expired'
+    };
+
+    // Countdown for pending bookings
+    let countdownHtml = '';
+    if (job.status === 'pending') {
+      const remaining = getTimeRemaining(job.createdAt);
+      const cls = remaining.expired ? 'expired-badge' : remaining.urgent ? 'urgent' : '';
+      countdownHtml = `<span class="countdown ${cls}" data-countdown-created="${job.createdAt}">${remaining.text}</span>`;
+    } else if (job.status === 'denied') {
+      countdownHtml = '<span class="denied-badge">Denied</span>';
+    } else if (job.status === 'expired') {
+      countdownHtml = '<span class="countdown expired-badge">Expired — not reviewed in 12h</span>';
+    }
+
+    // Get photos (live: URLs on the row; demo: data URLs in localStorage)
+    const photos = DB.getPhotos(job);
+
+    // Deny reason
+    const denyReasonHtml = job.denyReason ? `<div class="jd-row"><div class="jd-label">Deny Reason</div><div class="jd-value" style="color:#dc2626">${job.denyReason}</div></div>` : '';
+
+    // Status action buttons based on current status
+    let actionButtons = '';
+    if (job.status === 'pending') {
+      actionButtons = `
+        <button class="status-btn approve-btn" onclick="event.stopPropagation();approveJob('${job.code}')">✓ Approve</button>
+        <button class="status-btn deny-btn" onclick="event.stopPropagation();denyJob('${job.code}')">✕ Deny</button>
+      `;
+    } else if (job.status === 'approved') {
+      actionButtons = `<button class="status-btn enroute-btn" onclick="event.stopPropagation();updateStatus('${job.code}','enroute')">🚛 En Route</button>`;
+    } else if (job.status === 'enroute') {
+      actionButtons = `<button class="status-btn complete-btn" onclick="event.stopPropagation();updateStatus('${job.code}','complete')">✓ Mark Done</button>`;
+    }
+
+    card.innerHTML = `
+      <div class="job-top" onclick="toggleJob('${job.code}')">
+        <div class="job-status-dot ${job.status}"></div>
+        <div class="job-info">
+          <div class="job-name">${job.name} ${countdownHtml}</div>
+          <div class="job-meta">
+            <span>${job.size} truck</span>
+            <span>${job.town}</span>
+            <span>${statusLabel[job.status]}</span>
+          </div>
+        </div>
+        <div class="job-right">
+          <div class="job-price">$${job.price.toLocaleString()}</div>
+          <div class="job-time">${job.time}</div>
+        </div>
+      </div>
+      <div class="job-detail" id="detail-${job.code}">
+        <div class="jd-row"><div class="jd-label">Address</div><div class="jd-value">${job.address}, ${job.town}</div></div>
+        <div class="jd-row"><div class="jd-label">Phone</div><div class="jd-value"><a href="tel:${job.phone.replace(/\D/g, '')}">${job.phone}</a></div></div>
+        <div class="jd-row"><div class="jd-label">Code</div><div class="jd-value" style="font-family:monospace;font-weight:700">${job.code}</div></div>
+        ${job.notes ? `<div class="jd-row"><div class="jd-label">Notes</div><div class="jd-value">${job.notes}</div></div>` : ''}
+        ${photos.length ? `<div class="jd-row"><div class="jd-label">Photos</div><div class="jd-value"><div class="jd-photos">${photos.map(p => `<img src="${p}" alt="Job photo" onclick="event.stopPropagation();openPhoto('${p}')">`).join('')}</div></div></div>` : ''}
+        <div class="jd-row"><div class="jd-label">Booked</div><div class="jd-value">${new Date(job.createdAt).toLocaleString()}</div></div>
+        ${denyReasonHtml}
+        <div class="status-actions">
+          ${actionButtons}
+          <a class="status-btn call-btn" href="tel:${job.phone.replace(/\D/g, '')}" onclick="event.stopPropagation()" style="text-decoration:none;text-align:center">📞 Call</a>
+          <button class="status-btn delete-btn" onclick="event.stopPropagation();deleteJob('${job.code}')">🗑 Delete</button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+}
+
+function toggleJob(code) {
+  const detail = document.getElementById('detail-' + code);
+  detail.classList.toggle('open');
+}
+
+async function approveJob(code) {
+  await DB.updateBooking(code, { status: 'approved', approvedAt: new Date().toISOString() });
+  await renderJobs();
+}
+
+async function denyJob(code) {
+  const reason = prompt('Reason for denying this job (optional):') || '';
+  await DB.updateBooking(code, { status: 'denied', deniedAt: new Date().toISOString(), denyReason: reason });
+  await renderJobs();
+}
+
+async function updateStatus(code, newStatus) {
+  await DB.updateBooking(code, { status: newStatus });
+  await renderJobs();
+}
+
+async function deleteJob(code) {
+  if (!confirm('Delete this booking? This cannot be undone.')) return;
+  await DB.deleteBooking(code);
+  await renderJobs();
+}
+
+async function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+  await renderJobs();
+}
+
+// ── Photo Modal ──
+function openPhoto(url) {
+  document.getElementById('photoModalImg').src = url;
+  document.getElementById('photoModal').classList.add('open');
+}
+
+function closePhotoModal() {
+  document.getElementById('photoModal').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePhotoModal();
+});
+
+// ── Apply config.js values ──
+if (typeof APP_CONFIG !== 'undefined') {
+  const c = APP_CONFIG;
+  document.querySelector('.brand').textContent = c.businessName;
+  document.querySelector('.dh-title').textContent = c.admin.dashboardTitle;
+  document.querySelector('.login-card h1').textContent = c.admin.dashboardTitle;
+}
+
+// ── Choose login UI based on demo vs live mode ──
+setupLogin();
+</script>
+</body>
+</html>

@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book a Pickup | Dr Clutter — Junk Removal</title>
+<meta name="description" content="Book a junk removal pickup online. Upload a photo, pick a time, and Dr Clutter handles the rest. Lehigh Valley & Berks County, PA.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16a34a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="assets/mascot-icon.png">
+<link rel="icon" href="assets/mascot-icon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="db.js"></script>
+<style>
+/* ── Reset & Base ── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8faf8;color:#1a1a2e;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:#16a34a;text-decoration:none}
+
+/* ── Header ── */
+.header{background:#16a34a;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.header img{width:40px;height:40px;border-radius:10px}
+.header-text .brand{font-size:11px;font-weight:700;opacity:.8;letter-spacing:.5px;text-transform:uppercase}
+.header-text .title{font-size:18px;font-weight:800}
+.header-phone{margin-left:auto;background:rgba(255,255,255,.2);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600;color:#fff}
+.header-phone:hover{background:rgba(255,255,255,.3)}
+
+/* ── Progress Bar ── */
+.progress-bar{display:flex;gap:4px;padding:12px 20px;background:#fff;border-bottom:1px solid #e8e8e8}
+.progress-step{flex:1;height:6px;border-radius:3px;background:#e0e0e0;transition:background .3s}
+.progress-step.active{background:#16a34a}
+.progress-step.done{background:#16a34a}
+.step-labels{display:flex;padding:0 20px 8px;background:#fff;font-size:10px;color:#888}
+.step-labels span{flex:1;text-align:center}
+.step-labels span.active{color:#16a34a;font-weight:700}
+
+/* ── Step Container ── */
+.steps-container{max-width:500px;margin:0 auto;padding:20px}
+.step-panel{display:none;animation:fadeIn .3s ease}
+.step-panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.step-title{font-size:20px;font-weight:800;margin-bottom:4px}
+.step-subtitle{font-size:13px;color:#666;margin-bottom:20px}
+
+/* ── Form Fields ── */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;font-weight:700;color:#444;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:2px solid #ddd;border-radius:10px;font-size:15px;font-family:inherit;transition:border-color .2s;background:#fff}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#16a34a;box-shadow:0 0 0 3px rgba(22,163,74,.1)}
+.field textarea{resize:vertical;min-height:80px}
+.field .hint{font-size:11px;color:#888;margin-top:4px}
+.field.error input,.field.error select{border-color:#dc2626}
+.field.error .error-msg{display:block;color:#dc2626;font-size:11px;margin-top:4px}
+.error-msg{display:none}
+
+/* ── Photo Upload ── */
+.photo-zone{border:3px dashed #ccc;border-radius:14px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .2s;background:#fafff8}
+.photo-zone:hover,.photo-zone.dragover{border-color:#16a34a;background:#f0fdf4}
+.photo-zone .cam-icon{font-size:48px;margin-bottom:8px}
+.photo-zone .upload-text{font-size:14px;font-weight:600;color:#333}
+.photo-zone .upload-hint{font-size:12px;color:#888;margin-top:4px}
+.photo-preview{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.photo-thumb{position:relative;width:90px;height:90px;border-radius:10px;overflow:hidden;border:2px solid #ddd}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-thumb .remove-photo{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1}
+.photo-count{font-size:12px;color:#16a34a;font-weight:600;margin-top:8px}
+
+/* ── Truck Size Picker ── */
+.size-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.size-card{border:2.5px solid #e0e0e0;border-radius:14px;padding:16px 12px;text-align:center;cursor:pointer;transition:all .2s;background:#fff}
+.size-card:hover{border-color:#16a34a;transform:translateY(-1px)}
+.size-card.selected{border-color:#16a34a;background:#f0fdf4;box-shadow:0 0 0 3px rgba(22,163,74,.15)}
+.size-card .truck-icon{font-size:28px;margin-bottom:4px}
+.size-card .size-price{font-size:24px;font-weight:900;color:#16a34a}
+.size-card .size-label{font-size:12px;font-weight:700;color:#333;margin-top:2px}
+.size-card .size-desc{font-size:11px;color:#888;margin-top:4px;line-height:1.3}
+.size-note{font-size:12px;color:#666;margin-top:14px;padding:10px;background:#f0fdf4;border-radius:8px;line-height:1.5}
+
+/* ── Date/Time Picker ── */
+.date-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;-webkit-overflow-scrolling:touch}
+.date-chip{flex-shrink:0;border:2px solid #e0e0e0;border-radius:12px;padding:10px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;min-width:72px}
+.date-chip:hover{border-color:#16a34a}
+.date-chip.selected{border-color:#16a34a;background:#f0fdf4}
+.date-chip .day-name{font-size:11px;font-weight:700;color:#888}
+.date-chip .day-num{font-size:18px;font-weight:800;color:#1a1a2e;margin-top:2px}
+.date-chip .month{font-size:10px;color:#888}
+.date-chip.today .day-name{color:#16a34a}
+.date-chip.today::after{content:'Today';display:block;font-size:9px;color:#16a34a;font-weight:700;margin-top:2px}
+.date-chip.selected .day-name,.date-chip.selected .day-num{color:#16a34a}
+
+.time-label{font-size:12px;font-weight:700;color:#444;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.3px}
+.time-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.time-chip{border:2px solid #e0e0e0;border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;font-size:13px;font-weight:600}
+.time-chip:hover{border-color:#16a34a}
+.time-chip.selected{border-color:#16a34a;background:#f0fdf4;color:#16a34a}
+.time-chip.unavailable{opacity:.4;cursor:not-allowed;text-decoration:line-through}
+.same-day-badge{display:inline-block;background:#fef3c7;color:#92400e;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;margin-bottom:10px}
+
+/* ── Confirm Screen ── */
+.confirm-card{background:#fff;border:2px solid #e0e0e0;border-radius:14px;overflow:hidden}
+.confirm-header{background:#f0fdf4;padding:16px;border-bottom:1px solid #e0e0e0;text-align:center}
+.confirm-header .check-icon{font-size:36px}
+.confirm-header h3{font-size:16px;font-weight:800;margin-top:4px}
+.confirm-row{display:flex;padding:14px 16px;border-bottom:1px solid #f0f0f0;align-items:flex-start;gap:12px}
+.confirm-row:last-child{border-bottom:none}
+.confirm-row .cr-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.confirm-row .cr-label{font-size:11px;color:#888;text-transform:uppercase;font-weight:600;letter-spacing:.3px}
+.confirm-row .cr-value{font-size:14px;font-weight:600;color:#1a1a2e}
+.confirm-photos{display:flex;gap:6px;margin-top:6px}
+.confirm-photos img{width:50px;height:50px;border-radius:6px;object-fit:cover}
+.confirm-price{text-align:center;padding:16px;background:#f0fdf4;border-top:2px solid #e0e0e0}
+.confirm-price .est-label{font-size:11px;color:#888;text-transform:uppercase;font-weight:600}
+.confirm-price .est-price{font-size:32px;font-weight:900;color:#16a34a}
+.confirm-price .est-note{font-size:11px;color:#666;margin-top:4px}
+
+/* ── Success Screen ── */
+.success-panel{text-align:center;padding:40px 20px}
+.success-panel .success-icon{font-size:64px;margin-bottom:12px}
+.success-panel h2{font-size:22px;font-weight:800;margin-bottom:8px}
+.success-panel .booking-code{background:#f0fdf4;border:2px solid #16a34a;border-radius:10px;padding:12px 20px;display:inline-block;margin:12px 0;font-size:24px;font-weight:900;color:#16a34a;letter-spacing:2px}
+.success-panel p{font-size:14px;color:#666;max-width:340px;margin:0 auto 8px}
+.success-links{margin-top:20px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.success-links a{font-size:14px;font-weight:600}
+
+/* ── Buttons ── */
+.btn-row{display:flex;gap:10px;margin-top:24px}
+.btn{flex:1;padding:14px 20px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit}
+.btn-primary{background:#16a34a;color:#fff;box-shadow:0 4px 12px rgba(22,163,74,.3)}
+.btn-primary:hover{background:#15803d;transform:translateY(-1px)}
+.btn-primary:disabled{background:#ccc;box-shadow:none;cursor:not-allowed;transform:none}
+.btn-secondary{background:#fff;color:#16a34a;border:2px solid #16a34a}
+.btn-secondary:hover{background:#f0fdf4}
+
+/* ── Walk-Away Guarantee Banner ── */
+.guarantee{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fffbeb;border-radius:10px;margin-top:20px;border:1px solid #fde68a}
+.guarantee .g-icon{font-size:24px;flex-shrink:0}
+.guarantee .g-text{font-size:12px;color:#92400e;line-height:1.4}
+.guarantee .g-text strong{color:#78350f}
+
+/* ── Install Banner ── */
+.install-banner{display:none;padding:10px 20px;background:#1a1a2e;color:#fff;font-size:13px;text-align:center;cursor:pointer}
+.install-banner:hover{background:#2a2a3e}
+.install-banner .install-btn{background:#16a34a;color:#fff;border:none;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;margin-left:10px}
+
+/* ── Footer ── */
+.footer{text-align:center;padding:20px;font-size:11px;color:#aaa;margin-top:40px}
+.footer a{color:#16a34a}
+
+/* ── Responsive ── */
+@media(max-width:400px){
+  .size-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .time-grid{grid-template-columns:1fr 1fr;gap:6px}
+  .header-phone{display:none}
+  .steps-container{padding:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- Install Banner -->
+<div class="install-banner" id="installBanner">
+  Add Dr Clutter to your home screen for faster booking
+  <button class="install-btn" id="installBtn">Install</button>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <img src="assets/mascot-icon.png" alt="Dr Clutter" onerror="this.style.display='none'">
+  <div class="header-text">
+    <div class="brand">Dr Clutter</div>
+    <div class="title">Book a Pickup</div>
+  </div>
+  <a href="tel:+16103930024" class="header-phone">📞 Call</a>
+</div>
+
+<!-- Progress Bar -->
+<div class="progress-bar">
+  <div class="progress-step active" data-step="1"></div>
+  <div class="progress-step" data-step="2"></div>
+  <div class="progress-step" data-step="3"></div>
+</div>
+<div class="step-labels">
+  <span class="active" data-step="1">Info</span>
+  <span data-step="2">Size</span>
+  <span data-step="3">When</span>
+</div>
+
+<!-- Steps -->
+<div class="steps-container">
+
+  <!-- STEP 1: Contact Info -->
+  <div class="step-panel active" id="step1">
+    <div class="step-title">Tell us about you</div>
+    <div class="step-subtitle">So we know where to send the truck.</div>
+
+    <div class="field" id="f-name">
+      <label for="name">Your Name</label>
+      <input type="text" id="name" placeholder="First and last name" autocomplete="name" required>
+      <div class="error-msg">Please enter your name</div>
+    </div>
+
+    <div class="field" id="f-phone">
+      <label for="phone">Phone Number</label>
+      <input type="tel" id="phone" placeholder="(610) 555-1234" autocomplete="tel" required>
+      <div class="error-msg">Please enter a valid phone number</div>
+    </div>
+
+    <div class="field" id="f-address">
+      <label for="address">Pickup Address</label>
+      <input type="text" id="address" placeholder="123 Main St" autocomplete="street-address" required>
+      <div class="error-msg">Please enter the pickup address</div>
+    </div>
+
+    <div class="field" id="f-town">
+      <label for="town">Town</label>
+      <select id="town" required>
+        <option value="">Select your town</option>
+        <option value="Allentown">Allentown</option>
+        <option value="Bethlehem">Bethlehem</option>
+        <option value="Easton">Easton</option>
+        <option value="Kutztown">Kutztown</option>
+        <option value="Emmaus">Emmaus</option>
+        <option value="Macungie">Macungie</option>
+        <option value="Whitehall">Whitehall</option>
+        <option value="Trexlertown">Trexlertown</option>
+        <option value="Breinigsville">Breinigsville</option>
+        <option value="Northampton">Northampton</option>
+        <option value="Catasauqua">Catasauqua</option>
+        <option value="Hellertown">Hellertown</option>
+        <option value="Nazareth">Nazareth</option>
+        <option value="Reading">Reading</option>
+        <option value="Other">Other Lehigh Valley / Berks</option>
+      </select>
+      <div class="error-msg">Please select your town</div>
+    </div>
+
+    <div class="field">
+      <label for="notes">Anything we should know? <span style="font-weight:400;color:#888">(optional but helps with pricing)</span></label>
+      <textarea id="notes" placeholder="Stairs, tight spaces, heavy items, gate codes… The more detail, the more accurate your estimate."></textarea>
+      <div class="hint">Be as detailed as possible — accurate pricing depends on an accurate description.</div>
+    </div>
+
+    <!-- Photo Upload (inline) -->
+    <div class="field">
+      <label>Got a photo of the junk? <span style="font-weight:400;color:#888">(optional — speeds up your estimate)</span></label>
+      <div class="photo-zone" id="photoZone" onclick="document.getElementById('photoInput').click()">
+        <div class="cam-icon">📸</div>
+        <div class="upload-text">Tap to take a photo or choose from gallery</div>
+        <div class="upload-hint">Up to 5 photos · JPG, PNG · 10 MB max each</div>
+      </div>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" multiple style="display:none" onchange="handlePhotos(this.files)">
+      <div class="photo-preview" id="photoPreview"></div>
+      <div class="photo-count" id="photoCount"></div>
+    </div>
+
+    <div class="btn-row">
+      <a href="index.html" class="btn btn-secondary" style="text-align:center">← Back</a>
+      <button class="btn btn-primary" onclick="nextStep(2)">Next: Pick Size →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: Truck Size -->
+  <div class="step-panel" id="step2">
+    <div class="step-title">How much junk?</div>
+    <div class="step-subtitle">Pick the closest match. This is just an estimate — the final price is confirmed on-site.</div>
+
+    <div class="size-grid">
+      <div class="size-card" onclick="selectSize(this, '1/10', 150)" data-size="1/10">
+        <div class="truck-icon">🗑️</div>
+        <div class="size-price">$150</div>
+        <div class="size-label">1/10 Truck</div>
+        <div class="size-desc">A few items — chair, small appliance, boxes</div>
+      </div>
+      <div class="size-card" onclick="selectSize(this, '2/10', 250)" data-size="2/10">
+        <div class="truck-icon">📦</div>
+        <div class="size-price">$250</div>
+        <div class="size-label">2/10 Truck</div>
+        <div class="size-desc">A room corner — couch, table, some boxes</div>
+      </div>
+      <div class="size-card" onclick="selectSize(this, '1/2', 550)" data-size="1/2">
+        <div class="truck-icon">🚛</div>
+        <div class="size-price">$550</div>
+        <div class="size-label">Half Truck</div>
+        <div class="size-desc">A garage cleanout or a full room</div>
+      </div>
+      <div class="size-card" onclick="selectSize(this, 'full', 1050)" data-size="full">
+        <div class="truck-icon">🏠</div>
+        <div class="size-price">$1,050</div>
+        <div class="size-label">Full Truck</div>
+        <div class="size-desc">Whole-house, estate cleanout, major job</div>
+      </div>
+    </div>
+
+    <div class="size-note">
+      <strong>Our truck is 16 feet long</strong> — about 60% more room than the typical 10-ft franchise truck. Same fraction, way more junk gone. Multi-truck jobs get 10% off each additional truck.
+    </div>
+
+    <div class="size-note" style="background:#fffbeb;border:1px solid #fde68a;margin-top:10px">
+      <strong>⚠️ Additional fees apply for:</strong> paint cans, tires, mattresses, and TVs. These items require special handling and disposal. Your final price will reflect these if applicable.
+    </div>
+
+    <div class="size-note" style="background:#eff6ff;border:1px solid #bfdbfe;margin-top:10px">
+      <strong>📋 Pricing is subject to accuracy of your description.</strong> The more detail you provide about your items (in the notes and photos), the more accurate your estimate. Final price is confirmed on-site.
+    </div>
+
+    <div class="guarantee">
+      <div class="g-icon">🤝</div>
+      <div class="g-text"><strong>Walk-away guarantee.</strong> Don't like the final on-site price? You pay nothing and we shake hands. No pressure, no games.</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep(1)">← Back</button>
+      <button class="btn btn-primary" id="sizeNextBtn" onclick="nextStep(3)" disabled>Pick a size first</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: Date & Time -->
+  <div class="step-panel" id="step3">
+    <div class="step-title">When should we come?</div>
+    <div class="step-subtitle">Pick a day and a 2-hour window. Same-day available if booked before noon.</div>
+
+    <div class="date-scroll" id="dateScroll"></div>
+
+    <div class="time-label">Pick a time window</div>
+    <div id="sameDayBadge" class="same-day-badge" style="display:none">⚡ Same-day — gone by 6 PM or $50 off</div>
+    <div class="time-grid" id="timeGrid">
+      <div class="time-chip" onclick="selectTime(this, '8:00 AM - 10:00 AM')">8–10 AM</div>
+      <div class="time-chip" onclick="selectTime(this, '10:00 AM - 12:00 PM')">10 AM–12</div>
+      <div class="time-chip" onclick="selectTime(this, '12:00 PM - 2:00 PM')">12–2 PM</div>
+      <div class="time-chip" onclick="selectTime(this, '2:00 PM - 4:00 PM')">2–4 PM</div>
+      <div class="time-chip" onclick="selectTime(this, '4:00 PM - 6:00 PM')">4–6 PM</div>
+      <div class="time-chip" onclick="selectTime(this, '6:00 PM - 8:00 PM')">6–8 PM</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep(2)">← Back</button>
+      <button class="btn btn-primary" id="timeNextBtn" onclick="showConfirm()" disabled>Pick a date & time</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: Confirm -->
+  <div class="step-panel" id="step4">
+    <div class="step-title">Review your booking</div>
+    <div class="step-subtitle">Make sure everything looks right before we lock it in.</div>
+
+    <div class="confirm-card">
+      <div class="confirm-header">
+        <div class="check-icon">📋</div>
+        <h3>Booking Summary</h3>
+      </div>
+      <div class="confirm-row">
+        <div class="cr-icon">👤</div>
+        <div>
+          <div class="cr-label">Customer</div>
+          <div class="cr-value" id="conf-name">—</div>
+        </div>
+      </div>
+      <div class="confirm-row">
+        <div class="cr-icon">📍</div>
+        <div>
+          <div class="cr-label">Pickup Address</div>
+          <div class="cr-value" id="conf-address">—</div>
+        </div>
+      </div>
+      <div class="confirm-row">
+        <div class="cr-icon">📞</div>
+        <div>
+          <div class="cr-label">Phone</div>
+          <div class="cr-value" id="conf-phone">—</div>
+        </div>
+      </div>
+      <div class="confirm-row" id="conf-photos-row" style="display:none">
+        <div class="cr-icon">📸</div>
+        <div>
+          <div class="cr-label">Photos</div>
+          <div class="confirm-photos" id="conf-photos"></div>
+        </div>
+      </div>
+      <div class="confirm-row">
+        <div class="cr-icon">🚛</div>
+        <div>
+          <div class="cr-label">Estimated Load</div>
+          <div class="cr-value" id="conf-size">—</div>
+        </div>
+      </div>
+      <div class="confirm-row">
+        <div class="cr-icon">📅</div>
+        <div>
+          <div class="cr-label">Pickup Date & Time</div>
+          <div class="cr-value" id="conf-datetime">—</div>
+        </div>
+      </div>
+      <div class="confirm-row" id="conf-notes-row" style="display:none">
+        <div class="cr-icon">📝</div>
+        <div>
+          <div class="cr-label">Notes</div>
+          <div class="cr-value" id="conf-notes">—</div>
+        </div>
+      </div>
+      <div class="confirm-price">
+        <div class="est-label">Estimated Price</div>
+        <div class="est-price" id="conf-price">—</div>
+        <div class="est-note">Final price confirmed on-site · walk-away guarantee</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="prevStep(3)">← Edit</button>
+      <button class="btn btn-primary" id="submitBtn" onclick="submitBooking()">✓ Confirm Booking</button>
+    </div>
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="step-panel" id="stepSuccess">
+    <div class="success-panel">
+      <div class="success-icon">🎉</div>
+      <h2>Request submitted!</h2>
+      <p>Dr Clutter will review your request and approve or follow up within <strong>12 hours</strong>.</p>
+      <div class="booking-code" id="bookingCode">—</div>
+      <p style="font-size:12px;color:#888">Save this code to track your job status.</p>
+      <p style="font-size:12px;color:#666;max-width:340px;margin:8px auto 0">Remember: your final price is confirmed on-site and depends on the accuracy of your description. Paint cans, tires, mattresses, and TVs carry an additional fee.</p>
+      <div class="success-links">
+        <a href="tracker.html">📍 Track My Pickup →</a>
+        <a href="index.html">← Back to Dr Clutter</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <a href="index.html">Dr Clutter</a> · Family-run since 2011 · <a href="tel:+16103930024">(610) 393-0024</a>
+  <br>Prefer to call or text? We're here 7 AM – 9 PM, 7 days a week.
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// Dr Clutter PWA — Booking Logic
+// ══════════════════════════════════════════
+
+// ── Backend ──
+// Keys live in config.js (APP_CONFIG.supabase). When unset, DB runs in
+// demo mode (localStorage). All data access goes through the shared DB layer.
+
+// ── State ──
+let currentStep = 1;
+let booking = {
+  name: '', phone: '', address: '', town: '', notes: '',
+  photos: [],        // File objects
+  photoDataUrls: [], // For preview
+  size: '', price: 0,
+  date: '', dateDisplay: '',
+  time: '',
+  code: ''
+};
+
+// ── Navigation ──
+function nextStep(n) {
+  if (!validateStep(currentStep)) return;
+  saveStepData(currentStep);
+  goToStep(n);
+}
+
+function prevStep(n) {
+  goToStep(n);
+}
+
+function goToStep(n) {
+  currentStep = n;
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+
+  // Update progress bar
+  document.querySelectorAll('.progress-step').forEach(s => {
+    const sn = parseInt(s.dataset.step);
+    s.classList.toggle('active', sn === n);
+    s.classList.toggle('done', sn < n);
+  });
+  document.querySelectorAll('.step-labels span').forEach(s => {
+    s.classList.toggle('active', parseInt(s.dataset.step) === n);
+  });
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Initialize date picker on step 3
+  if (n === 3) initDatePicker();
+}
+
+// ── Validation ──
+function validateStep(n) {
+  if (n === 1) {
+    let valid = true;
+    ['name', 'phone', 'address', 'town'].forEach(id => {
+      const el = document.getElementById(id);
+      const field = document.getElementById('f-' + id);
+      if (!el.value.trim()) {
+        field.classList.add('error');
+        valid = false;
+      } else {
+        field.classList.remove('error');
+      }
+    });
+    // Basic phone validation
+    const phone = document.getElementById('phone').value.replace(/\D/g, '');
+    if (phone.length < 10) {
+      document.getElementById('f-phone').classList.add('error');
+      valid = false;
+    }
+    return valid;
+  }
+  if (n === 2 && !booking.size) return false;
+  if (n === 3 && (!booking.date || !booking.time)) return false;
+  return true;
+}
+
+function saveStepData(n) {
+  if (n === 1) {
+    booking.name = document.getElementById('name').value.trim();
+    booking.phone = document.getElementById('phone').value.trim();
+    booking.address = document.getElementById('address').value.trim();
+    booking.town = document.getElementById('town').value;
+    booking.notes = document.getElementById('notes').value.trim();
+  }
+}
+
+// ── Phone formatting ──
+document.getElementById('phone').addEventListener('input', function(e) {
+  let val = e.target.value.replace(/\D/g, '');
+  if (val.length > 10) val = val.slice(0, 10);
+  if (val.length >= 6) {
+    e.target.value = '(' + val.slice(0,3) + ') ' + val.slice(3,6) + '-' + val.slice(6);
+  } else if (val.length >= 3) {
+    e.target.value = '(' + val.slice(0,3) + ') ' + val.slice(3);
+  }
+});
+
+// ── Photo Upload ──
+const photoZone = document.getElementById('photoZone');
+
+photoZone.addEventListener('dragover', e => { e.preventDefault(); photoZone.classList.add('dragover'); });
+photoZone.addEventListener('dragleave', () => photoZone.classList.remove('dragover'));
+photoZone.addEventListener('drop', e => {
+  e.preventDefault();
+  photoZone.classList.remove('dragover');
+  handlePhotos(e.dataTransfer.files);
+});
+
+function handlePhotos(files) {
+  const maxPhotos = 5;
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  const remaining = maxPhotos - booking.photos.length;
+
+  Array.from(files).slice(0, remaining).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > maxSize) { alert('Photo too large (max 10 MB): ' + file.name); return; }
+
+    booking.photos.push(file);
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      booking.photoDataUrls.push(e.target.result);
+      renderPhotoPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoPreview() {
+  const container = document.getElementById('photoPreview');
+  container.innerHTML = '';
+  booking.photoDataUrls.forEach((url, i) => {
+    const div = document.createElement('div');
+    div.className = 'photo-thumb';
+    div.innerHTML = `<img src="${url}" alt="Junk photo ${i+1}"><button class="remove-photo" onclick="removePhoto(${i})" title="Remove">×</button>`;
+    container.appendChild(div);
+  });
+  const count = document.getElementById('photoCount');
+  count.textContent = booking.photos.length ? `${booking.photos.length} of 5 photos added` : '';
+}
+
+function removePhoto(i) {
+  booking.photos.splice(i, 1);
+  booking.photoDataUrls.splice(i, 1);
+  renderPhotoPreview();
+}
+
+// ── Truck Size ──
+function selectSize(el, size, price) {
+  document.querySelectorAll('.size-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  booking.size = size;
+  booking.price = price;
+
+  const btn = document.getElementById('sizeNextBtn');
+  btn.disabled = false;
+  btn.textContent = 'Next: Pick Date & Time →';
+}
+
+// ── Date Picker ──
+function initDatePicker() {
+  const container = document.getElementById('dateScroll');
+  container.innerHTML = '';
+  const now = new Date();
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const chip = document.createElement('div');
+    chip.className = 'date-chip' + (i === 0 ? ' today' : '');
+    if (booking.date === dateStr) chip.classList.add('selected');
+    chip.innerHTML = `
+      <div class="day-name">${days[d.getDay()]}</div>
+      <div class="day-num">${d.getDate()}</div>
+      <div class="month">${months[d.getMonth()]}</div>
+    `;
+    chip.onclick = () => selectDate(chip, dateStr, days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate(), i === 0);
+    container.appendChild(chip);
+  }
+
+  // Auto-select today if nothing chosen
+  if (!booking.date) {
+    const firstChip = container.querySelector('.date-chip');
+    if (firstChip) firstChip.click();
+  }
+}
+
+function selectDate(el, dateStr, display, isToday) {
+  document.querySelectorAll('.date-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  booking.date = dateStr;
+  booking.dateDisplay = display;
+
+  // Show same-day badge
+  const badge = document.getElementById('sameDayBadge');
+  const now = new Date();
+  badge.style.display = (isToday && now.getHours() < 12) ? 'inline-block' : 'none';
+
+  // Grey out past time slots for today
+  const currentHour = now.getHours();
+  document.querySelectorAll('.time-chip').forEach(chip => {
+    chip.classList.remove('unavailable');
+    if (isToday) {
+      const slotHour = parseInt(chip.textContent);
+      const isPM = chip.textContent.includes('PM') && !chip.textContent.includes('12');
+      const hour24 = isPM ? slotHour + 12 : (chip.textContent.includes('12') ? 12 : slotHour);
+      if (hour24 <= currentHour + 1) {
+        chip.classList.add('unavailable');
+        if (chip.classList.contains('selected')) {
+          chip.classList.remove('selected');
+          booking.time = '';
+          updateTimeButton();
+        }
+      }
+    }
+  });
+
+  updateTimeButton();
+}
+
+function selectTime(el, timeStr) {
+  if (el.classList.contains('unavailable')) return;
+  document.querySelectorAll('.time-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  booking.time = timeStr;
+  updateTimeButton();
+}
+
+function updateTimeButton() {
+  const btn = document.getElementById('timeNextBtn');
+  if (booking.date && booking.time) {
+    btn.disabled = false;
+    btn.textContent = 'Review Booking →';
+  } else {
+    btn.disabled = true;
+    btn.textContent = 'Pick a date & time';
+  }
+}
+
+// ── Confirm Screen ──
+function showConfirm() {
+  if (!booking.date || !booking.time) return;
+
+  document.getElementById('conf-name').textContent = booking.name;
+  document.getElementById('conf-address').textContent = booking.address + ', ' + booking.town;
+  document.getElementById('conf-phone').textContent = booking.phone;
+  document.getElementById('conf-size').textContent = booking.size + ' truck';
+  document.getElementById('conf-datetime').textContent = booking.dateDisplay + ' · ' + booking.time;
+  document.getElementById('conf-price').textContent = '$' + booking.price.toLocaleString();
+
+  // Photos
+  const photosRow = document.getElementById('conf-photos-row');
+  const photosContainer = document.getElementById('conf-photos');
+  if (booking.photoDataUrls.length) {
+    photosRow.style.display = 'flex';
+    photosContainer.innerHTML = '';
+    booking.photoDataUrls.forEach(url => {
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = 'Junk photo';
+      photosContainer.appendChild(img);
+    });
+  } else {
+    photosRow.style.display = 'none';
+  }
+
+  // Notes
+  const notesRow = document.getElementById('conf-notes-row');
+  if (booking.notes) {
+    notesRow.style.display = 'flex';
+    document.getElementById('conf-notes').textContent = booking.notes;
+  } else {
+    notesRow.style.display = 'none';
+  }
+
+  // Go to step 4 (confirm)
+  currentStep = 4;
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('step4').classList.add('active');
+  document.querySelectorAll('.progress-step').forEach(s => s.classList.add('done'));
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Submit ──
+async function submitBooking() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  // Generate booking code
+  booking.code = 'DC-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+
+  try {
+    await DB.createBooking({
+      code: booking.code,
+      name: booking.name,
+      phone: booking.phone,
+      address: booking.address,
+      town: booking.town,
+      notes: booking.notes,
+      size: booking.size,
+      price: booking.price,
+      date: booking.date,
+      dateDisplay: booking.dateDisplay,
+      time: booking.time,
+      photoFiles: booking.photos,        // File[] — uploaded to storage in live mode
+      photoDataUrls: booking.photoDataUrls // previews kept for demo mode
+    });
+    showSuccess();
+  } catch (err) {
+    console.error('Booking error:', err);
+    btn.disabled = false;
+    btn.textContent = '✓ Confirm Booking';
+    alert('Something went wrong. Please try again or call us at ' +
+      ((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.phoneDisplay) || '(610) 393-0024') + '.');
+  }
+}
+
+function showSuccess() {
+  document.getElementById('bookingCode').textContent = booking.code;
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('stepSuccess').classList.add('active');
+  document.querySelector('.progress-bar').style.display = 'none';
+  document.querySelector('.step-labels').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── PWA Install Prompt ──
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').style.display = 'block';
+});
+
+document.getElementById('installBtn').addEventListener('click', () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => {
+      document.getElementById('installBanner').style.display = 'none';
+      deferredPrompt = null;
+    });
+  }
+});
+
+// ── Register Service Worker ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ── Initialize ──
+document.addEventListener('DOMContentLoaded', () => {
+  // Clear error state on input
+  document.querySelectorAll('.field input, .field select').forEach(el => {
+    el.addEventListener('input', () => {
+      el.closest('.field').classList.remove('error');
+    });
+  });
+
+  // Apply config.js values if loaded
+  if (typeof APP_CONFIG !== 'undefined') {
+    const c = APP_CONFIG;
+    // Header
+    document.querySelector('.brand').textContent = c.businessName;
+    document.querySelector('.header-phone').href = 'tel:' + c.phone;
+    // Footer
+    const footer = document.querySelector('.footer');
+    if (footer) footer.innerHTML = `<a href="index.html">${c.businessName}</a> &middot; ${c.copy.footerText} &middot; <a href="tel:${c.phone}">${c.phoneDisplay}</a><br>Prefer to call or text? We're here 7 AM – 9 PM, 7 days a week.`;
+    // Success message
+    const successP = document.querySelector('#stepSuccess .success-panel p');
+    if (successP) successP.textContent = c.businessName + ' will confirm your pickup shortly via text message.';
+    // Alert fallback phone
+    // Theme color
+    document.querySelector('meta[name="theme-color"]').content = c.colors.primary;
+  }
+});
+</script>
+</body>
+</html>

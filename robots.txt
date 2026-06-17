@@ -1,0 +1,27 @@
+# Dr Clutter — drclutter.com
+# Allow all search engines and AI crawlers (AI visibility = customers in 2026)
+
+User-agent: *
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: BingBot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+Sitemap: https://drclutter.com/sitemap.xml

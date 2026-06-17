@@ -1,0 +1,39 @@
+{
+  "name": "Dr Clutter — Junk Removal",
+  "short_name": "Dr Clutter",
+  "description": "Book junk removal pickups, track your job, and get instant quotes — Lehigh Valley & Berks County, PA.",
+  "start_url": "/book.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "assets/mascot-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/mascot.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["business", "utilities"],
+  "lang": "en-US",
+  "shortcuts": [
+    {
+      "name": "Book a Pickup",
+      "url": "/book.html",
+      "description": "Schedule a junk removal pickup"
+    },
+    {
+      "name": "Track My Job",
+      "url": "/tracker.html",
+      "description": "Check the status of your booking"
+    }
+  ]
+}
